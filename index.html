@@ -57,6 +57,8 @@ main{display:flex;flex-direction:column}
 .page{width:100%}
 .page.center{margin:auto 0;padding-bottom:8px}
 .page.center h1{text-align:center;margin-bottom:6px}
+h1{padding-right:52px}
+.page.center h1{padding:0 52px}
 .sub{color:var(--label-2);font-size:15px;margin:0 0 22px}
 h2{font-size:20px;font-weight:600;letter-spacing:-.2px;margin:30px 0 12px}
 .card{background:var(--surface);border-radius:var(--r);padding:16px}
@@ -202,6 +204,16 @@ button.pill:active{background:var(--surface-2)}
 .clocklbl{font-size:14px;color:var(--label-2)}
 .clockbar{height:5px;border-radius:99px;background:var(--surface-2);margin-top:12px;overflow:hidden}
 .clockbar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width 1s linear}
+.clockbar i.green{background:var(--good);transition:width .45s cubic-bezier(.22,1,.36,1)}
+.donetoday{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-top:30px;min-height:52px;border-radius:14px;
+  background:rgba(48,209,88,.13);color:var(--good);font-size:17px;font-weight:600;
+}
+.doneban{
+  display:flex;align-items:center;justify-content:center;min-height:82px;border-radius:22px;
+  background:rgba(48,209,88,.14);color:var(--good);font-size:24px;font-weight:600;letter-spacing:-.4px;
+}
 
 /* ---------- záloha ---------- */
 textarea{
@@ -229,6 +241,16 @@ textarea:focus{outline:1.5px solid var(--accent)}
 .chip:active{background:var(--accent);color:#000}
 
 /* ---------- tabbar ---------- */
+.notesbtn{
+  position:fixed;z-index:35;
+  top:calc(env(safe-area-inset-top) + 14px);right:16px;
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);color:var(--label-2);
+}
+.notesbtn:active{background:var(--surface-2);color:var(--accent)}
+.notesbtn svg{width:20px;height:20px}
+.notesbtn i{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
 nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
   height:calc(var(--tab-h) + env(safe-area-inset-bottom));
@@ -243,6 +265,7 @@ nav button.on{color:var(--accent)}
 nav svg{width:24px;height:24px}
 
 /* ---------- sheet ---------- */
+#confetti{position:fixed;inset:0;width:100%;height:100%;z-index:60;pointer-events:none}
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;opacity:0;transition:opacity .25s ease;backdrop-filter:blur(2px)}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:51;
@@ -256,6 +279,7 @@ nav svg{width:24px;height:24px}
 .open .sheet{transform:translateY(0)}
 .grab{width:36px;height:5px;border-radius:99px;background:var(--surface-2);margin:0 auto 14px}
 .sheet h3{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-.2px}
+.sheet h3.bigwin{font-size:26px;letter-spacing:-.5px}
 .sheet p.hint{color:var(--label-2);font-size:14px;margin:0 0 18px}
 .field{background:var(--surface);border-radius:12px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
 .field label{font-size:15px;color:var(--label-2);flex-shrink:0}
@@ -272,6 +296,10 @@ nav svg{width:24px;height:24px}
 <body>
 <div id="app">
   <main id="main"><div class="skeleton">Načítám…</div></main>
+  <button id="notesbtn" class="notesbtn hidden" aria-label="Nápady">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.3 9.5 9.5 0 0 1-2.8-.4L3 21l1.7-4.9A8.2 8.2 0 0 1 3.7 11 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+    <i id="notesdot" class="hidden"></i>
+  </button>
   <nav id="nav" class="hidden">
     <button data-tab="today" class="on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 6.9 4" stroke-width="3" stroke-linecap="round"/></svg>
@@ -298,7 +326,7 @@ nav svg{width:24px;height:24px}
 
 /* ============ storage ============ */
 var KEY = "gymlog:v2";
-var DB = { v:2, workouts:[], active:null, levels:{}, lvlAge:{}, credit:{}, feel:null, sinceChange:0, backupAt:0, settings:{ targetMinutes:30, intervalDays:2 } };
+var DB = { v:2, workouts:[], active:null, levels:{}, lvlAge:{}, credit:{}, feel:null, sinceChange:0, backupAt:0, notes:[], fpu:null, settings:{ targetMinutes:30, intervalDays:2 } };
 var saveTimer = null, booted = false;
 
 var store = {
@@ -475,13 +503,41 @@ var PLAN=[
    {s:3,r:10,w:10},{s:2,r:15,w:10},{s:3,r:10,w:10,t:"3 s spouštění"},
    {s:3,r:10,w:12},{s:2,r:15,w:12},{s:3,r:10,w:14},{s:2,r:15,w:14},
    {s:3,r:10,w:16},{s:2,r:15,w:16},{s:3,r:10,w:18},{s:3,r:10,w:20}]},
- { n:"Dřepy s kettlebellem", why:"Nohy 12 kg přerostou nejdřív. Skok na 16 kg udělej po půlkách, pak přejdi na jednu nohu.", lv:[
-   {s:3,r:10,w:12},{s:2,r:15,w:12},{s:3,r:10,w:12,t:"2 s výdrž dole"},
-   {s:2,r:15,w:12,t:"první série s 16 kg"},{s:3,r:10,w:16},{s:2,r:15,w:16},
-   {s:3,r:10,w:16,t:"2 s výdrž dole"},
-   {s:2,r:15,w:12,t:"bulharský výpad, na nohu"},{s:2,r:15,w:16,t:"bulharský výpad, na nohu"},
-   {s:2,r:15,w:20,t:"bulharský výpad, na nohu"}]}
+ { n:"Dřepy s kettlebellem", why:"Máš jen 12 kg, takže zátěž se nemění. Těžší to dělá tempo, výdrž dole a nakonec jedna noha — ta ti zátěž zdvojnásobí bez nákupu čehokoli.", lv:[
+   {s:3,r:10,w:12},{s:2,r:15,w:12},
+   {s:3,r:10,w:12,t:"2 s výdrž dole"},{s:2,r:15,w:12,t:"2 s výdrž dole"},
+   {s:3,r:10,w:12,t:"3 s spouštění"},{s:2,r:15,w:12,t:"3 s spouštění"},
+   {s:3,r:10,w:12,t:"výpad vzad, na každou nohu"},{s:2,r:15,w:12,t:"výpad vzad, na každou nohu"},
+   {s:3,r:10,w:12,t:"bulharský výpad, na každou nohu"},{s:2,r:15,w:12,t:"bulharský výpad, na každou nohu"},
+   {s:3,r:10,w:12,t:"jednonohý dřep na židli, na každou nohu"}]}
 ];
+/* Fighter Pull-Up Program (Pavel Tsatsouline, podle kb5.cz).
+   5 sérií, klesající žebřík. Každý další tréninkový den se odspodu "dorovnává"
+   o jeden krok. Po pátém dni se základ zvedne o krok a jede se dál. */
+var FPU_NAME="Shyby";
+function fpuStep(max){ return max<=10 ? 1 : (max<=20 ? 2 : 4); }
+function fpuStart(max){ return max<=10 ? max : Math.round(max*0.8); }
+function fpuLadder(start, step, day){
+  var l=[];
+  for (var i=0;i<5;i++) l.push(Math.max(1, start-i*step));
+  for (var j=0;j<day;j++) l[4-j]=l[4-j]+step;   /* posledních `day` sérií o krok výš */
+  return l;
+}
+function fpuToday(){
+  var f=DB.fpu;
+  if (!f || !f.max) return null;
+  return { ladder:fpuLadder(f.start, f.step, f.day||0), day:(f.day||0)+1, cycle:(f.cycle||0)+1 };
+}
+function fpuInit(max){
+  max=Math.max(1, Math.min(40, parseInt(max,10)||5));
+  DB.fpu={ max:max, start:fpuStart(max), step:fpuStep(max), day:0, cycle:0 };
+}
+function fpuAdvance(){
+  var f=DB.fpu; if (!f || !f.max) return;
+  f.day=(f.day||0)+1;
+  if (f.day>4){ f.day=0; f.cycle=(f.cycle||0)+1; f.start+=f.step; }
+}
+
 function planIndex(name){ for (var i=0;i<PLAN.length;i++) if (PLAN[i].n===name) return i; return -1; }
 
 /* Dlouhodobá automatika.
@@ -504,7 +560,7 @@ function autoAdjust(feeling, session){
     var d=0; (e.sets||[]).forEach(function(x){ d+=Number(x.r)||0; });
     var t=e.target||30;
     return { i:planIndex(e.name), name:e.name, ratio:t?d/t:0, met:d>=t };
-  }).filter(function(x){ return x.i>=0 && x.ratio>0; });
+  }).filter(function(x){ return x.i>=0 && x.ratio>0 && !(x.name===FPU_NAME && DB.fpu && DB.fpu.max); });
 
   stat.forEach(function(x){
     DB.lvlAge[x.name]=(DB.lvlAge[x.name]||0)+1;
@@ -595,22 +651,27 @@ function viewToday(){
     var n=exs.length, i=Math.max(0, Math.min(n-1, A.idx||0)), e=exs[i];
     var mins=(Date.now()-A.startedAt)/60000;
     var mm=Math.floor(mins), ss=Math.floor((mins-mm)*60);
-    var doneR=0; e.sets.forEach(function(x){ doneR+=Number(x.r)||0; });
-    var tgt=e.target||30, full=doneR>=tgt;
-    var slots=Math.max(e.plan?e.plan.s:3, e.sets.length);
-    var kg=Number(String(e.draft.w).replace(",","."))||0, rp=parseInt(e.draft.r,10)||1;
-
+    var doneR=repsIn(e), tgt=e.target||30, full=doneR>=tgt;
+    var slots=Math.max(e.ladder ? e.ladder.length : (e.plan?e.plan.s:3), e.sets.length);
+    var kg=Number(String(e.draft.w).replace(",","."))||0;
+    var rp=nextReps(e);
     var tgtMin=DB.settings.targetMinutes, pctT=Math.min(mins/tgtMin,1);
+    var doneEx=exs.filter(function(x){ return repsIn(x)>=(x.target||30); }).length;
+
     h='<div class="ghead">'+
       '<button class="pill" data-act="prev"'+(i===0?' disabled style="opacity:.35"':'')+' aria-label="Předchozí cvik">‹</button>'+
       '<span class="mid">Cvik '+(i+1)+' z '+n+'</span>'+
       '<button class="pill" data-act="next"'+(i===n-1?' disabled style="opacity:.35"':'')+' aria-label="Další cvik">›</button>'+
       '</div>';
+
     h+='<div class="clockbox">'+
        '<div class="clockrow"><div class="clock num'+(manual?" small":(mins>=tgtMin?" over":""))+'" id="clock">'+
        (manual ? fmtShort.format(pd(A.date||today())) : mm+":"+String(ss).padStart(2,"0"))+'</div>'+
        '<div class="clocklbl">'+(manual ? "ruční zápis · "+(A.minutes||tgtMin)+" min" : "z "+tgtMin+" minut")+'</div></div>'+
        (manual ? '' : '<div class="clockbar"><i id="clockbar" style="width:'+(pctT*100).toFixed(1)+'%"></i></div>')+
+       '<div class="clockrow" style="margin-top:12px"><div class="clocklbl" style="flex:1">'+
+         doneEx+' z '+n+' cviků hotovo</div></div>'+
+       '<div class="clockbar"><i class="green" style="width:'+(doneEx/n*100).toFixed(1)+'%"></i></div>'+
        '</div>';
 
     h+='<div class="exname">'+esc(e.name)+'</div>';
@@ -619,13 +680,14 @@ function viewToday(){
     h+='<div class="dots">';
     for (var k=0;k<slots;k++){
       var st=e.sets[k];
-      h+='<div class="dot'+(st?" on":"")+'">'+(st?st.r:"")+'</div>';
+      var want=e.ladder ? e.ladder[k] : (e.plan?e.plan.r:"");
+      h+='<div class="dot'+(st?" on":"")+'">'+(st ? st.r : (want||""))+'</div>';
     }
     h+='</div>';
     h+='<div class="repcount'+(full?" ok":"")+'"><b class="num">'+doneR+'</b> / '+tgt+' opakování</div>';
 
     if (full){
-      h+='<button class="btn big" data-act="'+(i===n-1?"finish":"next")+'">'+(i===n-1?"Uložit trénink":"Další cvik")+'</button>';
+      h+='<div class="doneban">Hotovo ✓</div>';
       h+='<div class="quick"><button class="qbtn" data-act="log">Ještě série</button>'+
          '<button class="qbtn" data-act="undo">Zpět</button></div>';
     } else {
@@ -641,8 +703,7 @@ function viewToday(){
 
     h+='<div class="strip"><div class="list">';
     exs.forEach(function(x,j){
-      var dr=0; x.sets.forEach(function(y){ dr+=Number(y.r)||0; });
-      var t2=x.target||30, ok=dr>=t2;
+      var dr=repsIn(x), t2=x.target||30, ok=dr>=t2;
       h+='<button class="row'+(j===i?" cur":"")+'" data-act="jump" data-i="'+j+'">'+
         '<span class="tick'+(ok?" on":"")+'">'+(ok?"✓":"")+'</span>'+
         '<div class="g"><div class="t">'+esc(x.name)+'</div></div>'+
@@ -671,7 +732,10 @@ function viewToday(){
        '</div></button>';
   });
   h+='</div>';
-  h+='<button class="btn" style="margin-top:30px" data-act="start">Začít trénink</button>';
+  var doneToday=DB.workouts.some(function(w){ return w.date===today(); });
+  h+= doneToday
+    ? '<div class="donetoday"><span class="tick on">✓</span> Dnes splněno</div>'
+    : '<button class="btn" style="margin-top:30px" data-act="start">Začít trénink</button>';
   h+='<button class="btn link" data-act="manual">Nahrát manuálně</button>';
   return h;
 }
@@ -680,6 +744,15 @@ function viewStats(){
   var h='<h1>Přehled</h1>';
   if (DB.workouts.length<1) return h+'<p class="sub">Trend se objeví po prvním zápisu.</p><div class="empty">Zatím tu nic není.<br>Zapiš trénink a graf začne růst.</div>';
   h+='<p class="sub">Cíl: '+DB.settings.targetMinutes+' minut každý '+DB.settings.intervalDays+'. den</p>';
+
+  var yr=String(new Date().getFullYear());
+  var yrN=DB.workouts.filter(function(w){ return w.date.indexOf(yr)===0; }).length;
+  var yrMin=DB.workouts.filter(function(w){ return w.date.indexOf(yr)===0; })
+                       .reduce(function(t,w){ return t+(w.minutes||0); },0);
+  h+='<div class="card" style="margin-bottom:14px"><div class="bar-head" style="margin-bottom:2px">'+
+     '<b style="font-size:28px;letter-spacing:-.6px" class="num">'+yrN+'</b><span>'+yr+'</span></div>'+
+     '<div style="font-size:14px;color:var(--label-2)">'+pl(yrN,"trénink letos","tréninky letos","tréninků letos")+
+     (yrMin>=60 ? ' · '+nPl(Math.round(yrMin/60),"hodina","hodiny","hodin")+' u toho' : '')+'</div></div>';
 
   /* monthly progress bar */
   var mg=monthGoal(), pct=Math.min(mg.done/mg.goal,1);
@@ -763,6 +836,16 @@ function viewPlan(){
      'Nikdy dřív než po '+CREDIT_MIN_SESSIONS+' trénincích na dané úrovni a nejvýš jeden cvik za trénink.</div></div>';
   h+='<div class="list">';
   PLAN.forEach(function(p,i){
+    if (p.n===FPU_NAME){
+      var f=fpuToday();
+      h+='<button class="row" data-act="fpu"><div class="g"><div class="t">'+esc(p.n)+'</div>'+
+        '<div class="s">'+(f ? "Fighter Pull-Up · "+f.ladder.join(", ") : "Fighter Pull-Up — nastav si maximum")+'</div>'+
+        '<div class="s" style="margin-top:5px">'+(f ? "cyklus "+f.cycle+", den "+f.day+" z 5 · základ "+DB.fpu.start
+                                                    : "ťukni a zadej, kolik dáš shybů v kuse")+'</div></div>'+
+        '<div class="v">'+(f?"FPU":"—")+'</div>'+
+        '<svg class="chev" width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg></button>';
+      return;
+    }
     var L=lvl(i), x=p.lv[L];
     var cr=Math.max(0, creditOf(p.n)), th=threshold(i), age=DB.lvlAge[p.n]||0;
     var pc=Math.min(cr/th,1)*100;
@@ -781,7 +864,10 @@ function viewPlan(){
   });
   h+='</div>';
   var totS=0, totR=0;
-  PLAN.forEach(function(p,i){ var x=p.lv[lvl(i)]; totS+=x.s; totR+=x.s*x.r; });
+  PLAN.forEach(function(p,i){
+    if (p.n===FPU_NAME){ var f=fpuToday(); if (f){ totS+=5; totR+=f.ladder.reduce(function(t,q){ return t+q; },0); return; } }
+    var x=p.lv[lvl(i)]; totS+=x.s; totR+=x.s*x.r;
+  });
   h+='<p style="font-size:13px;color:var(--label-3);margin:12px 4px 0;line-height:1.5">Dohromady '+totS+' sérií a '+totR+
      ' opakování. Při minutě na sérii jsi na '+totS+' minutách — pokud ti to přerůstá '+DB.settings.targetMinutes+
      ', posuň se o úroveň výš u cviku s nejvíc sériemi. Nikdy neškrtej celý cvik.</p>';
@@ -850,12 +936,47 @@ function viewHistory(){
 
 function buildSession(){
   return PLAN.map(function(p,k){
+    if (p.n===FPU_NAME){
+      var f=fpuToday();
+      if (f){
+        var sum=f.ladder.reduce(function(t,n){ return t+n; },0);
+        return { name:p.n, sets:[], target:sum, ladder:f.ladder,
+                 plan:{s:5,r:f.ladder[0],w:0},
+                 hint:"Fighter Pull-Up · cyklus "+f.cycle+", den "+f.day+" · "+f.ladder.join(", "),
+                 draft:{ w:0, r:f.ladder[0] } };
+      }
+    }
     var x=p.lv[lvl(k)];
     return { name:p.n, sets:[], target:x.s*x.r, plan:{s:x.s,r:x.r,w:x.w},
              hint:lvLabel(x), draft:{ w:x.w, r:x.r } };
   });
 }
+function repsIn(e){ var t=0; (e.sets||[]).forEach(function(x){ t+=Number(x.r)||0; }); return t; }
+function nextReps(e){
+  if (e.ladder) return e.ladder[Math.min(e.sets.length, e.ladder.length-1)];
+  return parseInt(e.draft.r,10)||1;
+}
+function allDone(){
+  var xs=(DB.active&&DB.active.exercises)||[];
+  return xs.length>0 && xs.every(function(x){ return repsIn(x)>=(x.target||30); });
+}
 function cur(){ var A=DB.active; return A.exercises[Math.max(0,Math.min(A.exercises.length-1,A.idx||0))]; }
+/* Po dokončení cviku chvíli ukáže "Hotovo" a sám přejde dál.
+   Když je hotové všechno, rovnou uzavře trénink. */
+var advTimer=null;
+function queueAdvance(){
+  clearTimeout(advTimer);
+  var wait = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 250 : 850;
+  advTimer=setTimeout(function(){
+    if (!DB.active) return;
+    if (allDone()){ celebrate(); sheetFinish(true); return; }
+    var xs=DB.active.exercises, n=xs.length, from=DB.active.idx||0;
+    for (var k=1;k<=n;k++){
+      var j=(from+k)%n;
+      if (repsIn(xs[j]) < (xs[j].target||30)){ DB.active.idx=j; saveNow(); render(); scrollTop(); return; }
+    }
+  }, wait);
+}
 function scrollTop(){ var m=document.getElementById("main"); if(m) m.scrollTop=0; }
 
 /* ============ render ============ */
@@ -864,6 +985,9 @@ function render(){
   var body = tab==="today" ? viewToday() : tab==="plan" ? viewPlan() : tab==="stats" ? viewStats() : viewHistory();
   m.innerHTML = '<div class="page'+((tab==="today" && !DB.active) ? " center" : "")+'">'+body+'</div>';
   document.getElementById("nav").classList.remove("hidden");
+  var nb=document.getElementById("notesbtn");
+  nb.classList.remove("hidden");
+  document.getElementById("notesdot").classList.toggle("hidden", DB.notes.length===0);
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function(b){
     b.classList.toggle("on", b.dataset.tab===tab);
   });
@@ -886,6 +1010,62 @@ function render(){
   }
 }
 
+/* ============ konfety ============ */
+function celebrate(){
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var old=document.getElementById("confetti"); if (old) old.remove();
+    var cv=document.createElement("canvas");
+    cv.id="confetti";
+    document.body.appendChild(cv);
+    var ctx=cv.getContext("2d"), dpr=Math.min(window.devicePixelRatio||1, 2);
+    var W=cv.clientWidth, H=cv.clientHeight;
+    cv.width=W*dpr; cv.height=H*dpr; ctx.scale(dpr,dpr);
+
+    var COLORS=["#FF9F0A","#FFD60A","#30D158","#FFFFFF","#64D2FF"];
+    var P=[], N=110;
+    for (var i=0;i<N;i++){
+      P.push({
+        x: W*(0.15+0.7*Math.random()),
+        y: H*0.42 + (Math.random()*40-20),
+        vx: (Math.random()-0.5)*9,
+        vy: -7-Math.random()*9,
+        w: 5+Math.random()*6,
+        h: 8+Math.random()*7,
+        rot: Math.random()*Math.PI,
+        vr: (Math.random()-0.5)*0.34,
+        c: COLORS[(Math.random()*COLORS.length)|0],
+        sway: Math.random()*Math.PI*2
+      });
+    }
+    var t0=performance.now(), DUR=2600;
+    (function frame(now){
+      var el=now-t0;
+      if (el>DUR || !document.getElementById("confetti")){ cv.remove(); return; }
+      ctx.clearRect(0,0,W,H);
+      var fade = el>DUR-700 ? Math.max(0,(DUR-el)/700) : 1;
+      for (var j=0;j<P.length;j++){
+        var p=P[j];
+        p.vy += 0.32;                    /* gravitace */
+        p.vx *= 0.995;
+        p.sway += 0.09;
+        p.x += p.vx + Math.sin(p.sway)*0.7;
+        p.y += p.vy;
+        p.rot += p.vr;
+        if (p.y>H+40) continue;
+        ctx.save();
+        ctx.globalAlpha=fade;
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle=p.c;
+        ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.rot*1.6)));
+        ctx.restore();
+      }
+      requestAnimationFrame(frame);
+    })(t0);
+  } catch(e){}
+}
+
 /* ============ sheet ============ */
 function openSheet(html, after){
   var mo=document.getElementById("modal"), sh=document.getElementById("sheet");
@@ -899,11 +1079,12 @@ function closeSheet(){
   setTimeout(function(){ mo.classList.add("hidden"); document.getElementById("sheet").innerHTML=""; }, 320);
 }
 document.getElementById("scrim").addEventListener("click", closeSheet);
+document.getElementById("notesbtn").addEventListener("click", sheetNotes);
 
 function backupBlob(){
   return JSON.stringify({ v:DB.v, workouts:DB.workouts, levels:DB.levels,
                           lvlAge:DB.lvlAge, credit:DB.credit, feel:DB.feel,
-                          sinceChange:DB.sinceChange, settings:DB.settings,
+                          sinceChange:DB.sinceChange, settings:DB.settings, notes:DB.notes, fpu:DB.fpu,
                           savedAt:new Date().toISOString() });
 }
 function applyBackup(o){
@@ -911,11 +1092,119 @@ function applyBackup(o){
   DB.workouts=o.workouts;
   DB.levels=o.levels||{}; DB.lvlAge=o.lvlAge||{}; DB.credit=o.credit||{};
   DB.feel=o.feel||null; DB.sinceChange=o.sinceChange||0;
+  DB.notes=Array.isArray(o.notes)?o.notes:[]; DB.fpu=o.fpu||null;
   if (o.settings) DB.settings=Object.assign(DB.settings, o.settings);
   DB.active=null; DB.backupAt=DB.workouts.length;
   return true;
 }
 function sinceBackup(){ return DB.workouts.length - (DB.backupAt||0); }
+
+function sheetFpu(){
+  var f=DB.fpu, cur=f&&f.max?f.max:5;
+  var prev=f&&f.max ? '<div class="card" style="margin-bottom:16px;font-size:15px;line-height:1.5;color:var(--label-2)">'+
+      'Teď jsi v cyklu '+((f.cycle||0)+1)+', den '+((f.day||0)+1)+' z 5. Dnešní žebřík: <b style="color:var(--label)">'+
+      fpuLadder(f.start,f.step,f.day||0).join(", ")+'</b><br>Po pátém dni se základ zvedne z '+f.start+' na '+(f.start+f.step)+'.</div>' : '';
+  openSheet(
+    '<h3>Shyby — Fighter Pull-Up</h3>'+
+    '<p class="hint">Program Pavla Tsatsoulina. Pět sérií, klesající žebřík. Každý trénink se odspodu dorovnává, po pátém dni se základ zvedne. Místo 30 opakování jedeš tenhle žebřík.</p>'+
+    prev+
+    '<div class="field"><label>Maximum v kuse</label><input id="fmax" inputmode="numeric" value="'+cur+'"><span style="color:var(--label-2);font-size:15px">shybů</span></div>'+
+    '<button class="btn" id="fset">'+(f&&f.max?"Přenastavit a začít znovu":"Spustit program")+'</button>'+
+    '<div class="card" style="margin-top:18px;font-size:14px;line-height:1.55;color:var(--label-2)">'+
+    'Maximum si změř po dvou třech dnech volna a buď přísný — jen čisté shyby, žádné houpání. Po čtyřech cyklech si dej pár dní pauzu a změř se znovu.<br><br>'+
+    'Autoři programu upozorňují, že je to měsíční „peakovací" blok, ne něco na napořád. Až narazíš na zeď, ozvi se a vyměníme ho.</div>'+
+    '<button class="btn ghost" id="fclr" style="margin-top:8px">Zpět na běžný žebřík</button>',
+    function(sh){
+      sh.querySelector("#fset").addEventListener("click", function(){
+        fpuInit(sh.querySelector("#fmax").value); saveNow(); closeSheet(); render();
+      });
+      sh.querySelector("#fclr").addEventListener("click", function(){
+        DB.fpu=null; saveNow(); closeSheet(); render();
+      });
+    }
+  );
+}
+
+function notesHtml(){
+  var list=DB.notes.slice().sort(function(a,b){ return b.ts-a.ts; });
+  var rows=list.map(function(x){
+    return '<div class="row"><div class="g"><div class="t" style="white-space:normal;font-weight:400">'+esc(x.t)+'</div>'+
+           '<div class="s">'+cap(fmtLong.format(pd(x.d)))+'</div></div>'+
+           '<button class="qbtn" style="flex:0 0 auto;min-height:34px;padding:0 12px;font-size:13px" data-del="'+x.ts+'">Smazat</button></div>';
+  }).join("");
+  return '<h3>Nápady</h3><p class="hint">Co doplnit, co změnit, co tě napadlo v posilovně.</p>'+
+    '<div class="field"><input id="ntext" placeholder="napiš nápad" autocomplete="off" enterkeyhint="done" style="text-align:left"></div>'+
+    '<button class="btn" id="nadd">Uložit nápad</button>'+
+    (list.length ? '<h3 style="margin-top:26px">Uložené ('+list.length+')</h3><div class="list" style="margin-top:10px">'+rows+'</div>'
+                 : '<div class="empty">Zatím prázdné.</div>');
+}
+function bindNotes(sh, focus){
+  var inp=sh.querySelector("#ntext");
+  function redraw(){
+    sh.innerHTML='<div class="grab"></div>'+notesHtml();
+    bindNotes(sh, true);
+    var dot=document.getElementById("notesdot");
+    if (dot) dot.classList.toggle("hidden", DB.notes.length===0);
+  }
+  function add(){
+    var v=inp.value.trim();
+    if (!v) return;
+    DB.notes.push({ t:v, d:today(), ts:Date.now() });
+    saveNow(); redraw();
+  }
+  sh.querySelector("#nadd").addEventListener("click", add);
+  inp.addEventListener("keydown", function(ev){ if (ev.key==="Enter"){ ev.preventDefault(); add(); } });
+  Array.prototype.forEach.call(sh.querySelectorAll("[data-del]"), function(b){
+    b.addEventListener("click", function(){
+      var ts=Number(b.dataset.del);
+      DB.notes=DB.notes.filter(function(x){ return x.ts!==ts; });
+      saveNow(); redraw();
+    });
+  });
+  if (focus) setTimeout(function(){ try { inp.focus(); } catch(e){} }, 60);
+}
+function notesHtml(){
+  var list=DB.notes.slice().sort(function(a,b){ return b.ts-a.ts; });
+  var rows=list.map(function(x){
+      return '<div class="row"><div class="g"><div class="t" style="white-space:normal;font-weight:400">'+esc(x.t)+'</div>'+
+             '<div class="s">'+cap(fmtLong.format(pd(x.d)))+'</div></div>'+
+             '<button class="qbtn" style="flex:0 0 auto;min-height:34px;padding:0 12px;font-size:13px" data-del="'+x.ts+'">Smazat</button></div>';
+    }).join("");
+  return '<h3>Nápady</h3><p class="hint">Co doplnit, co změnit, co tě napadlo v posilovně.</p>'+
+    '<div class="field"><input id="ntext" placeholder="napiš nápad" autocomplete="off" enterkeyhint="done" style="text-align:left"></div>'+
+    '<button class="btn" id="nadd">Uložit nápad</button>'+
+    (rows ? '<h3 style="margin-top:26px">Uložené ('+list.length+')</h3><div class="list" style="margin-top:10px">'+rows+'</div>'
+          : '<div class="empty">Zatím prázdné.</div>');
+}
+function bindNotes(sh, focus){
+  var inp=sh.querySelector("#ntext");
+  function redraw(){
+    sh.innerHTML='<div class="grab"></div>'+notesHtml();
+    bindNotes(sh, true);
+  }
+  function add(){
+    var v=inp.value.trim();
+    if (!v) return;
+    DB.notes.push({ t:v, d:today(), ts:Date.now() });
+    saveNow(); redraw();
+    var dot=document.getElementById("notesdot"); if (dot) dot.classList.remove("hidden");
+  }
+  sh.querySelector("#nadd").addEventListener("click", add);
+  inp.addEventListener("keydown", function(ev){ if (ev.key==="Enter") add(); });
+  Array.prototype.forEach.call(sh.querySelectorAll("[data-del]"), function(b){
+    b.addEventListener("click", function(){
+      var ts=Number(b.dataset.del);
+      DB.notes=DB.notes.filter(function(x){ return x.ts!==ts; });
+      saveNow(); redraw();
+      var dot=document.getElementById("notesdot");
+      if (dot) dot.classList.toggle("hidden", DB.notes.length===0);
+    });
+  });
+  if (focus) setTimeout(function(){ try { inp.focus(); } catch(e){} }, 60);
+}
+function sheetNotes(){
+  openSheet(notesHtml(), function(sh){ bindNotes(sh, false); });
+}
 
 function sheetBackup(){
   var dump=backupBlob();
@@ -1016,37 +1305,56 @@ function sheetManual(){
   );
 }
 
-function sheetFinish(){
+function sheetFinish(auto){
   var mins = DB.active.manual ? (DB.active.minutes||DB.settings.targetMinutes)
                              : Math.max(1, Math.round((Date.now()-DB.active.startedAt)/60000));
   var dflt = DB.active.manual ? (DB.active.date||today()) : today();
+  var head = auto
+    ? '<h3 class="bigwin">Trénink hotový 🎉</h3><p class="hint">'+nPl(mins,"minuta","minuty","minut")+' · '+
+      allReps()+' opakování. Poslední věc — jak to šlo?</p>'
+    : '<h3>Uložit trénink</h3><p class="hint">Ťukni, jak to šlo, a uloží se to.</p>';
   openSheet(
-    '<h3>Uložit trénink</h3><p class="hint">Datum můžeš přepsat dozadu i dopředu.</p>'+
-    '<div class="field"><label>Datum</label><input type="date" id="fdate" value="'+dflt+'"></div>'+
-    '<div class="field"><label>Délka</label><input id="fmin" inputmode="numeric" value="'+mins+'"><span style="color:var(--label-2);font-size:15px">min</span></div>'+
-    '<h3 style="margin-top:22px">Jak to šlo?</h3><p class="hint">Podle toho se příští trénink sám přitvrdí nebo povolí. Ťukni a uloží se.</p>'+
+    head+
     '<div class="feel">'+
       '<button class="fbtn" data-feel="easy"><b>Lehké</b><span>zvládl bych víc</span></button>'+
       '<button class="fbtn" data-feel="mid"><b>Akorát</b><span>dřina, ale dal jsem to</span></button>'+
       '<button class="fbtn" data-feel="hard"><b>Těžké</b><span>na hraně, nedal jsem vše</span></button>'+
+    '</div>'+
+    '<button class="btn link" id="tog" style="margin-top:14px">Upravit datum a délku</button>'+
+    '<div id="meta" class="hidden">'+
+      '<div class="field"><label>Datum</label><input type="date" id="fdate" value="'+dflt+'"></div>'+
+      '<div class="field"><label>Délka</label><input id="fmin" inputmode="numeric" value="'+mins+'"><span style="color:var(--label-2);font-size:15px">min</span></div>'+
     '</div>',
     function(sh){
+      sh.querySelector("#tog").addEventListener("click", function(){
+        sh.querySelector("#meta").classList.toggle("hidden");
+        this.textContent = sh.querySelector("#meta").classList.contains("hidden")
+          ? "Upravit datum a délku" : "Skrýt";
+      });
       Array.prototype.forEach.call(sh.querySelectorAll("[data-feel]"), function(b){
         b.addEventListener("click", function(){ commit(b.dataset.feel, sh); });
       });
     }
   );
 }
+function allReps(){
+  var t=0; ((DB.active&&DB.active.exercises)||[]).forEach(function(e){ t+=repsIn(e); });
+  return t;
+}
 
 function commit(feeling, sh){
-  var date=sh.querySelector("#fdate").value || today();
-  var m=parseInt(sh.querySelector("#fmin").value,10); if (isNaN(m)||m<1) m=1;
+  var dEl=sh.querySelector("#fdate"), mEl=sh.querySelector("#fmin");
+  var date=(dEl && dEl.value) || (DB.active.manual ? (DB.active.date||today()) : today());
+  var m=mEl ? parseInt(mEl.value,10) : NaN;
+  if (isNaN(m)||m<1) m = DB.active.manual ? (DB.active.minutes||DB.settings.targetMinutes)
+                     : Math.max(1, Math.round((Date.now()-DB.active.startedAt)/60000));
   var session=(DB.active.exercises||[]).filter(function(e){ return e.sets.length; });
   var changes=autoAdjust(feeling, session);
+  if (DB.fpu && DB.fpu.max && session.some(function(e){ return e.name===FPU_NAME; })) fpuAdvance();
   DB.workouts.push({ id:"w"+Date.now(), date:date, minutes:m, feel:feeling,
                      chg:(changes[0]?changes[0].dir:0),
                      exercises:session.map(function(e){ return { name:e.name, sets:e.sets }; }) });
-  DB.active=null; clearInterval(tick); save();
+  DB.active=null; clearInterval(tick); clearTimeout(advTimer); save();
 
   var body = changes.length
     ? '<div class="list">'+changes.map(function(c){
@@ -1084,6 +1392,16 @@ function sheetDay(k){
 
   var totS=0, totR=0;
   var rows=PLAN.map(function(p,i){
+    if (p.n===FPU_NAME){
+      var f=fpuToday();
+      if (f){
+        var sum=f.ladder.reduce(function(t,q){ return t+q; },0);
+        totS+=5; totR+=sum;
+        return '<div class="row"><div class="g"><div class="t">'+esc(p.n)+'</div>'+
+               '<div class="s">Fighter Pull-Up · '+f.ladder.join(", ")+'</div></div>'+
+               '<div class="v">'+sum+'×</div></div>';
+      }
+    }
     var x=p.lv[lvl(i)]; totS+=x.s; totR+=x.s*x.r;
     return '<div class="row"><div class="g"><div class="t">'+esc(p.n)+'</div>'+
            '<div class="s">'+esc(lvLabel(x))+'</div></div>'+
@@ -1141,14 +1459,16 @@ document.addEventListener("click", function(ev){
   }
   else if (a==="manual") sheetManual();
   else if (a==="lvl") sheetLevels(i);
+  else if (a==="fpu") sheetFpu();
   else if (a==="day") sheetDay(t.dataset.k);
   else if (a==="backup") sheetBackup();
   else if (a==="log"){
     var e0=cur();
-    e0.sets.push({ w:Number(String(e0.draft.w).replace(",","."))||0, r:parseInt(e0.draft.r,10)||1 });
+    e0.sets.push({ w:Number(String(e0.draft.w).replace(",","."))||0, r:nextReps(e0) });
     saveNow(); render();
+    if (repsIn(e0) >= (e0.target||30)) queueAdvance();
   }
-  else if (a==="undo"){ var e1=cur(); e1.sets.pop(); saveNow(); render(); }
+  else if (a==="undo"){ clearTimeout(advTimer); var e1=cur(); e1.sets.pop(); saveNow(); render(); }
   else if (a==="rep"){
     var e2=cur(), d=parseInt(t.dataset.d,10);
     e2.draft.r=Math.max(1, (parseInt(e2.draft.r,10)||1)+d);
@@ -1159,9 +1479,9 @@ document.addEventListener("click", function(ev){
     e3.draft.w=Math.max(0, Math.round(((Number(String(e3.draft.w).replace(",","."))||0)+dw)*10)/10);
     save(); render();
   }
-  else if (a==="next"){ DB.active.idx=Math.min(DB.active.exercises.length-1,(DB.active.idx||0)+1); save(); render(); scrollTop(); }
-  else if (a==="prev"){ DB.active.idx=Math.max(0,(DB.active.idx||0)-1); save(); render(); scrollTop(); }
-  else if (a==="jump"){ DB.active.idx=i; save(); render(); scrollTop(); }
+  else if (a==="next"){ clearTimeout(advTimer); DB.active.idx=Math.min(DB.active.exercises.length-1,(DB.active.idx||0)+1); save(); render(); scrollTop(); }
+  else if (a==="prev"){ clearTimeout(advTimer); DB.active.idx=Math.max(0,(DB.active.idx||0)-1); save(); render(); scrollTop(); }
+  else if (a==="jump"){ clearTimeout(advTimer); DB.active.idx=i; save(); render(); scrollTop(); }
   else if (a==="finish"){
     var any=(DB.active.exercises||[]).some(function(e){ return e.sets.length; });
     if (!any){ openSheet('<h3>Prázdný trénink</h3><p class="hint">Zapiš aspoň jednu sérii, jinak není co uložit.</p><button class="btn sec" id="ok">Zpět</button>', function(sh){ sh.querySelector("#ok").addEventListener("click", closeSheet); }); return; }
@@ -1199,6 +1519,8 @@ document.addEventListener("click", function(ev){
   if (!DB.credit) DB.credit={};
   if (DB.sinceChange==null) DB.sinceChange=0;
   if (DB.backupAt==null) DB.backupAt=0;
+  if (!Array.isArray(DB.notes)) DB.notes=[];
+  if (DB.fpu===undefined) DB.fpu=null;
   if (DB.active && !DB.active.exercises) DB.active.exercises=[];
   if (DB.active && !(DB.active.exercises||[]).length) DB.active.exercises=buildSession();
   if (DB.active && DB.active.idx==null) DB.active.idx=0;
