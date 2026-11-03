@@ -131,7 +131,14 @@ button.wd{text-align:center;background:none;padding:0;width:100%}
 .chev{color:var(--label-3);flex-shrink:0}
 .delta{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 .up{color:var(--good)} .down{color:var(--bad)} .flat{color:var(--label-2)}
-.month-label{font-size:13px;color:var(--label-2);margin:24px 0 8px 4px}
+.month-label{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:15px;font-weight:600;color:var(--label);margin:26px 4px 9px}
+.month-label .mcount{font-size:13px;font-weight:400;color:var(--label-2);font-variant-numeric:tabular-nums}
+.month-label .mcount b{color:var(--accent);font-weight:600}
+.hstats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.hstat{background:var(--surface);border-radius:14px;padding:14px}
+.hstat b{display:block;font-size:26px;letter-spacing:-.6px;line-height:1.1;white-space:nowrap}
+.hstat b small{font-size:15px;letter-spacing:0;font-weight:600;color:var(--label-2)}
+.hstat span{display:block;font-size:12px;color:var(--label-2);margin-top:4px}
 
 .minibar{height:3px;border-radius:99px;background:var(--surface-2);margin-top:9px;overflow:hidden;max-width:190px}
 .minibar i{display:block;height:100%;background:var(--accent);border-radius:99px}
@@ -1024,14 +1031,29 @@ function viewHistory(){
   var s=sorted().reverse();
   if (!s.length) return h+'<p class="sub">Zatím žádné tréninky.</p><div class="empty">Po prvním uložení se sem zapíše celý záznam.</div>'+
     '<button class="btn link" data-act="backup">Záloha a obnovení dat</button>';
-  var totV=s.reduce(function(t,w){ return t+volumeOf(w); },0);
-  var totR=s.reduce(function(t,w){ return t+repsOf(w); },0);
-  h+='<p class="sub">'+nPl(s.length,"trénink","tréninky","tréninků")+' · '+
-     (totV>0 ? fmtKg(totV)+' celkem' : totR+' opakování celkem')+'</p>';
+  var yr=String(new Date().getFullYear());
+  var ys=s.filter(function(w){ return w.date.indexOf(yr)===0; });
+  var yMin=ys.reduce(function(t,w){ return t+(w.minutes||0); },0);
+  h+='<p class="sub">'+nPl(s.length,"trénink","tréninky","tréninků")+' celkem</p>';
+  h+='<div class="hstats">'+
+     '<div class="hstat"><b class="num">'+ys.length+'</b><span>'+pl(ys.length,"trénink","tréninky","tréninků")+' v roce '+yr+'</span></div>'+
+     '<div class="hstat"><b class="num">'+fmtDurBig(yMin)+'</b><span>v gymu v roce '+yr+'</span></div>'+
+     '</div>';
+
+  /* součty po měsících */
+  var mon={};
+  s.forEach(function(w){ var k=w.date.slice(0,7); if(!mon[k]) mon[k]={n:0,min:0}; mon[k].n++; mon[k].min+=(w.minutes||0); });
+
   var curr="";
   s.forEach(function(w){
-    var m=cap(fmtMonth.format(pd(w.date)));
-    if (m!==curr){ if(curr) h+='</div>'; h+='<div class="month-label">'+m+'</div><div class="list">'; curr=m; }
+    var mk=w.date.slice(0,7);
+    if (mk!==curr){
+      if(curr) h+='</div>';
+      var M=mon[mk];
+      h+='<div class="month-label"><span>'+cap(fmtMonth.format(pd(w.date)))+'</span>'+
+         '<span class="mcount"><b>'+nPl(M.n,"trénink","tréninky","tréninků")+'</b> · '+fmtDur(M.min)+'</span></div><div class="list">';
+      curr=mk;
+    }
     var v=volumeOf(w);
     h+='<button class="row" data-act="open" data-id="'+w.id+'"><div class="g"><div class="t">'+cap(fmtLong.format(pd(w.date)))+'</div>'+
       '<div class="s">'+(w.minutes||0)+' min · '+nPl((w.exercises||[]).length,"cvik","cviky","cviků")+' · '+repsOf(w)+' opakování</div></div>'+
@@ -1208,6 +1230,18 @@ function applyBackup(o){
   if (o.settings) DB.settings=Object.assign(DB.settings, o.settings);
   DB.active=null; DB.backupAt=DB.workouts.length;
   return true;
+}
+function fmtDur(min){
+  min=Math.round(min||0);
+  var hh=Math.floor(min/60), mm=min%60;
+  if (!hh) return mm+" min";
+  return hh+" h"+(mm?" "+mm+" min":"");
+}
+function fmtDurBig(min){
+  min=Math.round(min||0);
+  var hh=Math.floor(min/60), mm=min%60;
+  if (!hh) return mm+'<small> min</small>';
+  return hh+'<small> h'+(mm?' '+mm+' min':'')+'</small>';
 }
 function sinceBackup(){ return DB.workouts.length - (DB.backupAt||0); }
 
