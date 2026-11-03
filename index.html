@@ -147,6 +147,25 @@ button.wd{text-align:center;background:none;padding:0;width:100%}
 .xtab td:last-child{text-align:right;color:var(--label);font-weight:600;font-variant-numeric:tabular-nums;width:48px}
 .xnote{font-size:12px;color:var(--label-3);margin:8px 4px 0;line-height:1.5}
 
+.calbox{background:var(--surface);border-radius:var(--r);padding:14px 16px;margin-top:12px}
+.calrow{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.calrow .g{flex:1;min-width:0}
+.calrow .t{font-size:16px;font-weight:600}
+.calrow .s{font-size:13px;color:var(--label-2);margin-top:2px}
+.caltime{background:var(--surface-2);border:0;border-radius:10px;padding:8px 10px;color:var(--label);
+  font-size:16px;font-variant-numeric:tabular-nums;min-width:92px;text-align:center}
+.caltime:focus{outline:1.5px solid var(--accent)}
+a.btn{text-decoration:none}
+.calbox .btn{min-height:46px;font-size:16px}
+.wc.incal::after{content:"";position:absolute;bottom:-9px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--label-2)}
+
+.mchips{display:flex;flex-wrap:wrap;gap:8px}
+.mchip{background:var(--surface);border-radius:99px;padding:10px 14px;font-size:14px;color:var(--label);font-variant-numeric:tabular-nums}
+.mchip.has{color:var(--label-3)}
+.mchip.on{background:var(--accent);color:#000;font-weight:600}
+.savedok{background:rgba(48,209,88,.13);color:var(--good);border-radius:12px;padding:11px 14px;font-size:14px;margin-bottom:14px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+
 /* ---------- chart ---------- */
 .chart{width:100%;height:auto;display:block;overflow:visible}
 .chart text{font-size:10px;fill:var(--label-3);font-family:inherit}
@@ -342,7 +361,7 @@ nav svg{width:24px;height:24px}
 
 /* ============ storage ============ */
 var KEY = "gymlog:v2";
-var DB = { v:2, workouts:[], active:null, levels:{}, lvlAge:{}, credit:{}, feel:null, sinceChange:0, backupAt:0, notes:[], fpu:null, settings:{ targetMinutes:30, intervalDays:2 } };
+var DB = { v:2, workouts:[], active:null, levels:{}, lvlAge:{}, credit:{}, feel:null, sinceChange:0, backupAt:0, notes:[], fpu:null, cal:{}, settings:{ targetMinutes:30, intervalDays:2, calTime:"17:00" } };
 var saveTimer = null, booted = false;
 
 var store = {
@@ -744,7 +763,7 @@ function viewToday(){
     if (w0 && w0.chg) badge=w0.chg;
     else if (x.plan && !hinted && hint){ badge=hint; hinted=true; }
     h+='<button class="wd'+(x.today?" now":"")+'" data-act="day" data-k="'+x.key+'">'+
-       '<span>'+x.wd+'</span><div class="wc '+cls+'">'+(x.done?"✓":x.day)+
+       '<span>'+x.wd+'</span><div class="wc '+cls+(DB.cal[x.key]&&!x.done?" incal":"")+'">'+(x.done?"✓":x.day)+
        (badge?'<i class="wbadge '+(badge>0?"up":"down")+'">'+(badge>0?"⬆":"⬇")+'</i>':'')+
        '</div></button>';
   });
@@ -816,6 +835,9 @@ function progressExplainer(){
           'a po pěti trénincích se celý žebřík zvedne o jedno. Tvoje odpověď po tréninku na něj nemá vliv.'
         : 'Shyby teď jedou běžný žebřík podle kreditu. V Plánu si můžeš zapnout program Fighter Pull-Up: zadáš maximum '+
           'a appka pak vede pět sérií v klesajícím žebříku, který se sám zvedá.'))+
+    item('Automatika a rychlý zápis',
+      'Trénink, který neuložíš do '+AUTO_CLOSE_MIN+' minut, se uloží sám jako „Akorát“. Rychlý zápis přes „Nahrát manuálně“ '+
+      'uloží celý plán jako odcvičený, taky jako „Akorát“. Oba se tedy počítají do posunu stejně jako běžný trénink.')+
     item('Kde to uvidíš',
       'V Plánu má každý cvik proužek postupu. V týdnu na hlavní stránce ukazují šipky ⬆ ⬇ tréninky, kdy se obtížnost změnila nebo změní. '+
       'Po uložení tréninku ti appka rovnou napíše, co se posunulo. Úroveň si můžeš kdykoli přepnout i ručně.')+
@@ -1170,7 +1192,7 @@ document.getElementById("notesbtn").addEventListener("click", sheetNotes);
 function backupBlob(){
   return JSON.stringify({ v:DB.v, workouts:DB.workouts, levels:DB.levels,
                           lvlAge:DB.lvlAge, credit:DB.credit, feel:DB.feel,
-                          sinceChange:DB.sinceChange, settings:DB.settings, notes:DB.notes, fpu:DB.fpu,
+                          sinceChange:DB.sinceChange, settings:DB.settings, notes:DB.notes, fpu:DB.fpu, cal:DB.cal,
                           savedAt:new Date().toISOString() });
 }
 function applyBackup(o){
@@ -1178,7 +1200,7 @@ function applyBackup(o){
   DB.workouts=o.workouts;
   DB.levels=o.levels||{}; DB.lvlAge=o.lvlAge||{}; DB.credit=o.credit||{};
   DB.feel=o.feel||null; DB.sinceChange=o.sinceChange||0;
-  DB.notes=Array.isArray(o.notes)?o.notes:[]; DB.fpu=o.fpu||null;
+  DB.notes=Array.isArray(o.notes)?o.notes:[]; DB.fpu=o.fpu||null; DB.cal=o.cal||{};
   if (o.settings) DB.settings=Object.assign(DB.settings, o.settings);
   DB.active=null; DB.backupAt=DB.workouts.length;
   return true;
@@ -1365,30 +1387,50 @@ function sheetBackup(){
 }
 
 function sheetManual(){
-  openSheet(
-    '<h3>Nahrát manuálně</h3><p class="hint">Ke kterému dni trénink patří? Může být zpětně i dopředu.</p>'+
-    '<div class="quick" style="flex-wrap:wrap">'+
-      '<button class="qbtn" data-md="-2">Předevčírem</button>'+
-      '<button class="qbtn" data-md="-1">Včera</button>'+
-      '<button class="qbtn" data-md="0">Dnes</button>'+
-    '</div>'+
-    '<div class="field" style="margin-top:12px"><label>Jiný den</label><input type="date" id="mdate" value="'+today()+'"></div>'+
-    '<div class="field"><label>Délka</label><input id="mmin" inputmode="numeric" value="'+DB.settings.targetMinutes+'"><span style="color:var(--label-2);font-size:15px">min</span></div>'+
-    '<button class="btn" id="mgo" style="margin-top:14px">Pokračovat na cviky</button>',
-    function(sh){
-      function go(k){
-        var mn=parseInt(sh.querySelector("#mmin").value,10);
-        DB.active={ startedAt:Date.now(), manual:true, date:k||today(),
-                    minutes:(isNaN(mn)||mn<1)?DB.settings.targetMinutes:mn,
-                    idx:0, exercises:buildSession() };
-        saveNow(); closeSheet(); tab="today"; render(); scrollTop();
-      }
-      Array.prototype.forEach.call(sh.querySelectorAll("[data-md]"), function(b){
-        b.addEventListener("click", function(){ go(addDays(today(), parseInt(b.dataset.md,10))); });
-      });
-      sh.querySelector("#mgo").addEventListener("click", function(){ go(sh.querySelector("#mdate").value); });
+  var sel=null, lastSaved=null;
+  function dayChips(){
+    var out='';
+    for (var i=6;i>=0;i--){
+      var k=addDays(today(), -i), has=DB.workouts.some(function(w){ return w.date===k; });
+      var lbl = i===0 ? "Dnes" : i===1 ? "Včera" : ["ne","po","út","st","čt","pá","so"][pd(k).getDay()]+" "+fmtShort.format(pd(k));
+      out+='<button class="mchip'+(has?" has":"")+(k===sel?" on":"")+'" data-k="'+k+'">'+lbl+(has?" ✓":"")+'</button>';
     }
-  );
+    return out;
+  }
+  function html(){
+    return '<h3>Nahrát manuálně</h3>'+
+      '<p class="hint">Vyber den a ulož. Rychlý zápis uloží celý tvůj plán jako odcvičený a počítá ho jako „Akorát“. ✓ znamená, že ten den už trénink máš.</p>'+
+      (lastSaved ? '<div class="savedok">Uloženo: '+cap(fmtLong.format(pd(lastSaved)))+'. Můžeš přidat další.</div>' : '')+
+      '<div class="mchips">'+dayChips()+'</div>'+
+      '<div class="field" style="margin-top:12px"><label>Jiný den</label><input type="date" id="mdate" value="'+(sel||"")+'"></div>'+
+      '<div class="field"><label>Délka</label><input id="mmin" inputmode="numeric" value="'+DB.settings.targetMinutes+'"><span style="color:var(--label-2);font-size:15px">min</span></div>'+
+      '<button class="btn" id="mquick" style="margin-top:14px"'+(sel?'':' disabled')+'>'+
+        (sel ? 'Uložit trénink · '+cap(fmtLong.format(pd(sel))) : 'Nejdřív vyber den')+'</button>'+
+      '<button class="btn link" id="mgo" style="margin-top:6px">Zapsat série po cvicích</button>'+
+      '<button class="btn ghost" id="mclose">Hotovo</button>';
+  }
+  function bind(sh){
+    function redraw(){ sh.innerHTML='<div class="grab"></div>'+html(); bind(sh); }
+    function minutes(){ var mn=parseInt(sh.querySelector("#mmin").value,10); return (isNaN(mn)||mn<1)?DB.settings.targetMinutes:Math.min(mn,600); }
+    Array.prototype.forEach.call(sh.querySelectorAll(".mchip"), function(b){
+      b.addEventListener("click", function(){ sel=b.dataset.k; redraw(); });
+    });
+    sh.querySelector("#mdate").addEventListener("change", function(){
+      var v=this.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v)){ sel=v; redraw(); }
+    });
+    sh.querySelector("#mquick").addEventListener("click", function(){
+      if (!sel) return;
+      storeWorkout("mid", sel, minutes(), fullPlanSession(), { quick:true });
+      saveNow(); lastSaved=sel; sel=null; redraw(); render();
+    });
+    sh.querySelector("#mgo").addEventListener("click", function(){
+      var k=sel||today();
+      DB.active={ startedAt:Date.now(), manual:true, date:k, minutes:minutes(), idx:0, exercises:buildSession() };
+      saveNow(); closeSheet(); tab="today"; render(); scrollTop();
+    });
+    sh.querySelector("#mclose").addEventListener("click", closeSheet);
+  }
+  openSheet(html(), bind);
 }
 
 function sheetFinish(auto){
@@ -1428,18 +1470,79 @@ function allReps(){
   return t;
 }
 
+/* Uloží trénink, připíše kredit, posune shyby. Vrací změny úrovní. */
+function storeWorkout(feeling, date, minutes, session, extra){
+  var changes=autoAdjust(feeling, session);
+  if (DB.fpu && DB.fpu.max && session.some(function(e){ return e.name===FPU_NAME; })) fpuAdvance();
+  var w={ id:"w"+Date.now()+Math.floor(Math.random()*1000), date:date, minutes:minutes, feel:feeling,
+          chg:(changes[0]?changes[0].dir:0),
+          exercises:session.map(function(e){ return { name:e.name, sets:e.sets }; }) };
+  if (extra) for (var k in extra) w[k]=extra[k];
+  DB.workouts.push(w);
+  return changes;
+}
+
+/* Celý aktuální plán jako odcvičený — pro rychlý zápis. */
+function fullPlanSession(){
+  return buildSession().map(function(e){
+    var sets=[];
+    if (e.ladder) e.ladder.forEach(function(r){ sets.push({ w:0, r:r }); });
+    else for (var k=0;k<e.plan.s;k++) sets.push({ w:e.plan.w||0, r:e.plan.r });
+    return { name:e.name, sets:sets, target:e.target };
+  });
+}
+
+/* ---------- automatické ukončení po 45 minutách ---------- */
+var AUTO_CLOSE_MIN = 45;
+function autoCloseCheck(){
+  var A=DB.active;
+  if (!A || A.manual) return false;
+  if (Date.now()-A.startedAt < AUTO_CLOSE_MIN*60000) return false;
+  if (document.querySelector("#sheet .feel")) return false;   /* právě odpovídáš, jak to šlo */
+  var session=(A.exercises||[]).filter(function(e){ return e.sets.length; });
+  var day=dk(new Date(A.startedAt));
+  clearInterval(tick); clearTimeout(advTimer);
+  if (!session.length){
+    DB.active=null; saveNow();
+    DB.autoNote={ empty:true, date:day };
+  } else {
+    /* délka = do poslední zapsané série, jinak strop 45 minut */
+    var mins = A.lastAt ? Math.round((A.lastAt-A.startedAt)/60000) : AUTO_CLOSE_MIN;
+    mins = Math.max(1, Math.min(AUTO_CLOSE_MIN, mins));
+    var ch=storeWorkout("mid", day, mins, session, { auto:true });
+    DB.active=null;
+    DB.autoNote={ date:day, minutes:mins, changes:ch };
+  }
+  saveNow();
+  return true;
+}
+function showAutoNote(){
+  var n=DB.autoNote; if (!n) return;
+  DB.autoNote=null; saveNow();
+  var body = n.empty
+    ? 'Trénink běžel přes '+AUTO_CLOSE_MIN+' minut a neměl zapsanou žádnou sérii, tak jsem ho zahodil.'
+    : 'Trénink běžel přes '+AUTO_CLOSE_MIN+' minut, tak jsem ho uložil sám jako „Akorát“. Délku jsem vzal do poslední zapsané série: '+
+      nPl(n.minutes,"minuta","minuty","minut")+'.'+
+      ((n.changes&&n.changes.length) ? '<br><br>Posun: '+n.changes.map(function(c){ return (c.dir>0?"↑ ":"↓ ")+esc(c.name)+" → "+esc(c.to); }).join(", ") : '');
+  openSheet('<h3>Trénink uložen automaticky</h3>'+
+    '<div class="card" style="font-size:15px;line-height:1.55;color:var(--label-2);margin-top:8px">'+body+'</div>'+
+    '<button class="btn" id="ok" style="margin-top:16px">OK</button>',
+    function(sh){ sh.querySelector("#ok").addEventListener("click", closeSheet); });
+}
+setInterval(function(){ if (booted && autoCloseCheck()){ render(); showAutoNote(); } }, 30000);
+document.addEventListener("visibilitychange", function(){
+  if (booted && !document.hidden && autoCloseCheck()){ render(); showAutoNote(); }
+});
+
 function commit(feeling, sh){
+  if (!DB.active){ closeSheet(); render(); return; }
   var dEl=sh.querySelector("#fdate"), mEl=sh.querySelector("#fmin");
   var date=(dEl && dEl.value) || (DB.active.manual ? (DB.active.date||today()) : today());
   var m=mEl ? parseInt(mEl.value,10) : NaN;
   if (isNaN(m)||m<1) m = DB.active.manual ? (DB.active.minutes||DB.settings.targetMinutes)
                      : Math.max(1, Math.round((Date.now()-DB.active.startedAt)/60000));
   var session=(DB.active.exercises||[]).filter(function(e){ return e.sets.length; });
-  var changes=autoAdjust(feeling, session);
-  if (DB.fpu && DB.fpu.max && session.some(function(e){ return e.name===FPU_NAME; })) fpuAdvance();
-  DB.workouts.push({ id:"w"+Date.now(), date:date, minutes:m, feel:feeling,
-                     chg:(changes[0]?changes[0].dir:0),
-                     exercises:session.map(function(e){ return { name:e.name, sets:e.sets }; }) });
+  var changes=storeWorkout(feeling, date, m, session);
   DB.active=null; clearInterval(tick); clearTimeout(advTimer); save();
 
   var body = changes.length
@@ -1453,10 +1556,76 @@ function commit(feeling, sh){
         : "Kredit se připsal. Posun přijde, až ho některý cvik nasbírá dost. Stav vidíš v Přehledu dole.")+'</div>';
   sh.innerHTML='<div class="grab"></div><h3>Uloženo</h3><p class="hint">'+
     (changes.length ? "Příští trénink bude jinak:" : "Zapsáno.")+'</p>'+body+
+    '<h3 style="margin-top:24px">Další trénink</h3>'+calBlock(nextTrainingDay())+
     '<button class="btn" id="done" style="margin-top:16px">Hotovo</button>'+
     '<button class="btn ghost" id="toplan">Otevřít plán</button>';
   sh.querySelector("#done").addEventListener("click", function(){ closeSheet(); tab="today"; render(); });
   sh.querySelector("#toplan").addEventListener("click", function(){ closeSheet(); tab="plan"; render(); });
+  bindCal(sh);
+}
+
+/* ============ Google Kalendář ============
+   Bez serveru a bez přihlašování: appka sestaví odkaz na formulář nové
+   události v Google Kalendáři, ty ji jen potvrdíš. */
+function nextTrainingDay(){
+  var d=nextDue();
+  if (d < today()) d=today();
+  if (d===today() && DB.workouts.some(function(w){ return w.date===today(); })) d=addDays(today(), DB.settings.intervalDays);
+  return d;
+}
+function calStamp(k, hhmm, plusMin){
+  var p=String(hhmm||"17:00").split(":"), d=pd(k);
+  d.setHours(parseInt(p[0],10)||0, (parseInt(p[1],10)||0)+(plusMin||0), 0, 0);
+  function z(n){ return String(n).padStart(2,"0"); }
+  return d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+"T"+z(d.getHours())+z(d.getMinutes())+"00";
+}
+function calEnd(hhmm){
+  var p=String(hhmm||"17:00").split(":"), m=(parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0)+DB.settings.targetMinutes;
+  return String(Math.floor(m/60)%24).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+}
+function calUrl(k){
+  var t=DB.settings.calTime||"17:00";
+  var lines=PLAN.map(function(p,i){
+    if (p.n===FPU_NAME){ var f=fpuToday(); if (f) return "• "+p.n+": "+f.ladder.join(", "); }
+    return "• "+p.n+": "+lvLabel(p.lv[lvl(i)]);
+  });
+  var details="Plán tréninku:\n"+lines.join("\n");
+  if (/^https?:/.test(location.href)) details+="\n\nAppka: "+location.href.split("#")[0];
+  var tz="";
+  try { tz=Intl.DateTimeFormat().resolvedOptions().timeZone||""; } catch(e){}
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE"+
+    "&text="+encodeURIComponent("Trénink")+
+    "&dates="+calStamp(k,t,0)+"/"+calStamp(k,t,DB.settings.targetMinutes)+
+    (tz?"&ctz="+encodeURIComponent(tz):"")+
+    "&details="+encodeURIComponent(details);
+}
+function calBlock(k){
+  var t=DB.settings.calTime||"17:00", added=!!DB.cal[k];
+  return '<div class="calbox" data-calk="'+k+'">'+
+    '<div class="calrow"><div class="g"><div class="t">Do kalendáře</div>'+
+      '<div class="s">'+cap(fmtLong.format(pd(k)))+' · '+t+'–'+calEnd(t)+'</div></div>'+
+      '<input type="time" class="caltime" value="'+t+'" aria-label="Čas tréninku"></div>'+
+    '<a class="btn sec calgo" target="_blank" rel="noopener" href="'+esc(calUrl(k))+'">'+
+      (added?'Přidáno ✓ · přidat znovu':'Přidat do Google Kalendáře')+'</a>'+
+  '</div>';
+}
+function bindCal(sh){
+  Array.prototype.forEach.call(sh.querySelectorAll(".calbox"), function(box){
+    var k=box.dataset.calk, a=box.querySelector(".calgo"), inp=box.querySelector(".caltime");
+    inp.addEventListener("change", function(){
+      if (!/^\d{1,2}:\d{2}$/.test(inp.value)) return;
+      DB.settings.calTime=inp.value; saveNow();
+      a.href=calUrl(k);
+      box.querySelector(".s").textContent=cap(fmtLong.format(pd(k)))+' · '+inp.value+'–'+calEnd(inp.value);
+    });
+    a.addEventListener("click", function(){
+      DB.cal[k]=true; saveNow();
+      setTimeout(function(){
+        a.textContent="Přidáno ✓ · přidat znovu";
+        if (!DB.active) render();          /* tečka u dne v týdnu */
+      }, 400);
+    });
+  });
 }
 
 function sheetDay(k){
@@ -1496,9 +1665,11 @@ function sheetDay(k){
     '<p class="hint">Co tě '+when+' čeká · '+totS+' sérií · '+totR+' opakování</p>'+
     '<div class="list">'+rows+'</div>'+
     (d===0 && !DB.active ? '<button class="btn" id="go" style="margin-top:16px">Začít trénink</button>' : '')+
+    (d>=0 ? calBlock(k) : '')+
     '<button class="btn ghost" id="ok">Zavřít</button>',
     function(sh){
       sh.querySelector("#ok").addEventListener("click", closeSheet);
+      bindCal(sh);
       var g=sh.querySelector("#go");
       if (g) g.addEventListener("click", function(){
         DB.active={ startedAt:Date.now(), manual:false, idx:0, exercises:buildSession() };
@@ -1550,6 +1721,7 @@ document.addEventListener("click", function(ev){
   else if (a==="log"){
     var e0=cur();
     e0.sets.push({ w:Number(String(e0.draft.w).replace(",","."))||0, r:nextReps(e0) });
+    DB.active.lastAt=Date.now();
     saveNow(); render();
     if (repsIn(e0) >= (e0.target||30)) queueAdvance();
   }
@@ -1606,6 +1778,8 @@ document.addEventListener("click", function(ev){
   if (DB.backupAt==null) DB.backupAt=0;
   if (!Array.isArray(DB.notes)) DB.notes=[];
   if (DB.fpu===undefined) DB.fpu=null;
+  if (!DB.cal || typeof DB.cal!=="object") DB.cal={};
+  if (!DB.settings.calTime) DB.settings.calTime="17:00";
   if (!DB.mig3){
     if (DB.levels && DB.levels["Bradla"]!=null) DB.levels["Bradla"]=Math.max(0, DB.levels["Bradla"]-2);
     DB.mig3=true;
@@ -1614,7 +1788,9 @@ document.addEventListener("click", function(ev){
   if (DB.active && !(DB.active.exercises||[]).length) DB.active.exercises=buildSession();
   if (DB.active && DB.active.idx==null) DB.active.idx=0;
   booted=true;
+  autoCloseCheck();
   render();
+  if (DB.autoNote) showAutoNote();
 })();
 /* iOS appku uspí bez varování, proto ukládáme při každém odchodu na pozadí. */
 document.addEventListener("visibilitychange", function(){ if (booted && document.hidden) saveNow(); });
