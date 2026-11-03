@@ -1632,7 +1632,7 @@ function calUrl(k){
   var tz="";
   try { tz=Intl.DateTimeFormat().resolvedOptions().timeZone||""; } catch(e){}
   return "https://calendar.google.com/calendar/render?action=TEMPLATE"+
-    "&text="+encodeURIComponent("Trénink")+
+    "&text="+encodeURIComponent("Gym 🏋🏻‍♂️")+
     "&dates="+calStamp(k,t,0)+"/"+calStamp(k,t,DB.settings.targetMinutes)+
     (tz?"&ctz="+encodeURIComponent(tz):"")+
     "&details="+encodeURIComponent(details);

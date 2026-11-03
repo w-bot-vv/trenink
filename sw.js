@@ -1,5 +1,5 @@
 /* Offline cache. Verzi zvyš, když nahraješ novou verzi appky. */
-const CACHE = "trenink-v8";
+const CACHE = "trenink-v9";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
