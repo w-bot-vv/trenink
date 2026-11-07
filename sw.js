@@ -1,6 +1,6 @@
 /* Offline cache. Verzi zvyš, když nahraješ novou verzi appky. */
-const CACHE = "trenink-v9";
-const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
+const CACHE = "trenink-v10";
+const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png?v=2", "./icon-192.png?v=2", "./icon-512.png?v=2"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
